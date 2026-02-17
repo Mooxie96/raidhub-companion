@@ -1,0 +1,31 @@
+[package]
+name = "raidhub-companion"
+version = "1.0.0"
+description = "Raidhub Companion - WoW CharTracker Sync"
+authors = ["mooxiie"]
+edition = "2021"
+
+[lib]
+name = "raidhub_companion_lib"
+crate-type = ["lib", "cdylib", "staticlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-autostart = "2"
+tauri-plugin-store = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-shell = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
+notify = "7"
+notify-debouncer-mini = "0.5"
+winreg = "0.55"
+chrono = { version = "0.4", features = ["serde"] }
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-autostart = "2"

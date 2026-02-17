@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Raidhub Companion</title>
+  <link rel="stylesheet" href="/src/styles.css" />
+</head>
+<body>
+  <div class="app">
+    <!-- Status Section -->
+    <div class="section">
+      <div class="section-header">
+        <span class="section-title">Connection</span>
+        <span id="watcher-badge" class="badge badge-inactive">Watcher Off</span>
+      </div>
+      <div class="status-row">
+        <div id="status-dot" class="status-dot disconnected"></div>
+        <span id="status-text" class="status-text">Not connected</span>
+      </div>
+      <div id="status-details" class="status-details" style="display: none;">
+        <span class="status-detail">Characters: <span id="char-count">0</span></span>
+        <span class="status-detail">Last sync: <span id="last-sync">Never</span></span>
+      </div>
+    </div>
+
+    <!-- Configuration Section -->
+    <div class="section">
+      <div class="section-header">
+        <span class="section-title">Configuration</span>
+      </div>
+
+      <!-- API Token -->
+      <div class="field">
+        <label class="field-label">API Token</label>
+        <div id="token-empty" class="field-row">
+          <input id="token-input" type="password" placeholder="Paste your ct_xxx token here..." />
+          <button id="btn-set-token" class="btn btn-primary btn-small">Connect</button>
+        </div>
+        <div id="token-set" class="token-display" style="display: none;">
+          <span id="token-prefix" class="token-masked">ct_••••••••</span>
+          <button id="btn-clear-token" class="btn btn-small btn-danger">Clear</button>
+        </div>
+      </div>
+
+      <!-- WoW Path -->
+      <div class="field">
+        <label class="field-label">WoW Path</label>
+        <div class="field-row">
+          <input id="wow-path" type="text" readonly placeholder="Auto-detecting..." />
+          <button id="btn-browse" class="btn btn-small">Browse</button>
+        </div>
+      </div>
+
+      <!-- Account selector -->
+      <div class="field" id="account-field" style="display: none;">
+        <label class="field-label">WoW Account</label>
+        <select id="account-select"></select>
+      </div>
+
+      <!-- Toggles -->
+      <div class="toggle-row">
+        <span class="toggle-label">Auto-sync on file change</span>
+        <label class="toggle">
+          <input type="checkbox" id="toggle-autosync" checked />
+          <span class="toggle-track"></span>
+        </label>
+      </div>
+      <div class="toggle-row">
+        <span class="toggle-label">Start with Windows</span>
+        <label class="toggle">
+          <input type="checkbox" id="toggle-autostart" />
+          <span class="toggle-track"></span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Activity Log -->
+    <div class="section log-container">
+      <div class="section-header">
+        <span class="section-title">Activity</span>
+        <button id="btn-clear-log" class="btn btn-small">Clear</button>
+      </div>
+      <div id="log-scroll" class="log-scroll">
+        <div id="log-empty" class="log-empty">No activity yet</div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <button id="btn-sync" class="btn btn-primary" disabled>Sync Now</button>
+      <div class="footer-info">
+        <span>v1.0.0</span>
+        <a id="link-website" class="footer-link">Manage on website</a>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
