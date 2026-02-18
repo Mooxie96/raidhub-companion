@@ -1,6 +1,7 @@
 /// HTTP client for the Raidhub API.
 /// Handles sync and status endpoints with Bearer token auth.
 
+use crate::bis_sync::ObtainedItemUpdate;
 use crate::gargul_parser::GargulSyncPayload;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
@@ -137,6 +138,63 @@ impl RaidhubApiClient {
         match response.status().as_u16() {
             200 => response
                 .json::<GdkpSyncResponse>()
+                .await
+                .map_err(|e| ApiError::ServerError(format!("Failed to parse response: {}", e))),
+            401 => Err(ApiError::Unauthorized),
+            400 => {
+                let text = response.text().await.unwrap_or_default();
+                Err(ApiError::BadRequest(text))
+            }
+            status => {
+                let text = response.text().await.unwrap_or_default();
+                Err(ApiError::ServerError(format!("HTTP {}: {}", status, text)))
+            }
+        }
+    }
+
+    /// GET /api/chartracker/bis-export — download BiS lists for addon
+    pub async fn get_bis_export(&self) -> Result<Value, ApiError> {
+        let response = self
+            .client
+            .get(format!("{}/api/chartracker/bis-export", BASE_URL))
+            .header("Authorization", format!("Bearer {}", self.token))
+            .send()
+            .await
+            .map_err(|e| ApiError::NetworkError(e.to_string()))?;
+
+        match response.status().as_u16() {
+            200 => response
+                .json::<Value>()
+                .await
+                .map_err(|e| ApiError::ServerError(format!("Failed to parse response: {}", e))),
+            401 => Err(ApiError::Unauthorized),
+            status => {
+                let text = response.text().await.unwrap_or_default();
+                Err(ApiError::ServerError(format!("HTTP {}: {}", status, text)))
+            }
+        }
+    }
+
+    /// POST /api/chartracker/bis-sync — sync obtained items back to website
+    pub async fn sync_bis_obtained(
+        &self,
+        items: &[ObtainedItemUpdate],
+    ) -> Result<Value, ApiError> {
+        let body = serde_json::json!({ "obtained_items": items });
+
+        let response = self
+            .client
+            .post(format!("{}/api/chartracker/bis-sync", BASE_URL))
+            .header("Authorization", format!("Bearer {}", self.token))
+            .header("Content-Type", "application/json")
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| ApiError::NetworkError(e.to_string()))?;
+
+        match response.status().as_u16() {
+            200 => response
+                .json::<Value>()
                 .await
                 .map_err(|e| ApiError::ServerError(format!("Failed to parse response: {}", e))),
             401 => Err(ApiError::Unauthorized),

@@ -11,6 +11,7 @@ use std::time::Duration;
 pub enum WatcherEvent {
     FileChanged(PathBuf),
     GargulChanged(PathBuf),
+    BisChanged(PathBuf),
     Error(String),
 }
 
@@ -29,6 +30,7 @@ pub fn start_watching(
     let (tx, rx) = mpsc::channel();
     let chartracker_file = "chartracker.lua";
     let gargul_file = "gargul.lua";
+    let bis_file = "chartrackerBiS.lua".to_lowercase();
 
     let sender = tx.clone();
     let mut debouncer = new_debouncer(
@@ -50,6 +52,9 @@ pub fn start_watching(
                                 } else if name == gargul_file {
                                     let _ = sender
                                         .send(WatcherEvent::GargulChanged(event.path.clone()));
+                                } else if name == bis_file {
+                                    let _ = sender
+                                        .send(WatcherEvent::BisChanged(event.path.clone()));
                                 }
                             }
                         }

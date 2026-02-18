@@ -3,6 +3,7 @@
 
 use crate::api_client::RaidhubApiClient;
 use crate::app_state::{ConnectionStatus, LogEntry, LogLevel, Settings, SharedState};
+use crate::bis_sync;
 use crate::gargul_parser;
 use crate::lua_parser;
 use crate::wow_detector::{self, WowAccount};
@@ -363,6 +364,144 @@ pub async fn sync_gdkp(state: State<'_, SharedState>) -> Result<String, String> 
         }
         Err(e) => {
             let msg = format!("GDKP sync failed: {}", e);
+            state.lock().unwrap().add_log(LogLevel::Error, &msg);
+            Err(msg)
+        }
+    }
+}
+
+// ============================================================
+// BiS Sync
+// ============================================================
+
+#[tauri::command]
+pub async fn download_bis(state: State<'_, SharedState>) -> Result<String, String> {
+    let (token, wow_path, wow_account) = {
+        let app = state.lock().unwrap();
+        (
+            app.settings.api_token.clone(),
+            app.settings.wow_path.clone(),
+            app.settings.wow_account.clone(),
+        )
+    };
+
+    let token = token.ok_or("No API token configured")?;
+    let wow_path = wow_path.ok_or("WoW path not configured")?;
+    let wow_account = wow_account.ok_or("WoW account not selected")?;
+
+    state
+        .lock()
+        .unwrap()
+        .add_log(LogLevel::Info, "Downloading BiS data...");
+
+    let client = RaidhubApiClient::new(&token);
+    let bis_data = client.get_bis_export().await.map_err(|e| {
+        let msg = format!("Failed to download BiS data: {}", e);
+        state.lock().unwrap().add_log(LogLevel::Error, &msg);
+        msg
+    })?;
+
+    // Count items
+    let item_count = bis_data
+        .get("characters")
+        .and_then(|c| c.as_object())
+        .map(|chars| {
+            chars
+                .values()
+                .filter_map(|c| c.get("items"))
+                .filter_map(|items| items.as_array())
+                .map(|items| items.len())
+                .sum::<usize>()
+        })
+        .unwrap_or(0);
+
+    if item_count == 0 {
+        let msg = "No BiS items found. Create a BiS list on the website first.".to_string();
+        state.lock().unwrap().add_log(LogLevel::Info, &msg);
+        return Ok(msg);
+    }
+
+    // Write to SavedVariables directory
+    let sv_path = PathBuf::from(&wow_path)
+        .join("_classic_")
+        .join("WTF")
+        .join("Account")
+        .join(&wow_account)
+        .join("SavedVariables")
+        .join("CharTrackerBiS.lua");
+
+    bis_sync::write_bis_to_saved_variables(&bis_data, &sv_path).map_err(|e| {
+        let msg = format!("Failed to write BiS data: {}", e);
+        state.lock().unwrap().add_log(LogLevel::Error, &msg);
+        msg
+    })?;
+
+    let result_msg = format!(
+        "BiS data downloaded: {} items. /reload in WoW to load.",
+        item_count
+    );
+    state
+        .lock()
+        .unwrap()
+        .add_log(LogLevel::Success, &result_msg);
+
+    Ok(result_msg)
+}
+
+#[tauri::command]
+pub async fn sync_bis_obtained(state: State<'_, SharedState>) -> Result<String, String> {
+    let (token, wow_path, wow_account) = {
+        let app = state.lock().unwrap();
+        (
+            app.settings.api_token.clone(),
+            app.settings.wow_path.clone(),
+            app.settings.wow_account.clone(),
+        )
+    };
+
+    let token = token.ok_or("No API token configured")?;
+    let wow_path = wow_path.ok_or("WoW path not configured")?;
+    let wow_account = wow_account.ok_or("WoW account not selected")?;
+
+    let sv_path = PathBuf::from(&wow_path)
+        .join("_classic_")
+        .join("WTF")
+        .join("Account")
+        .join(&wow_account)
+        .join("SavedVariables")
+        .join("CharTrackerBiS.lua");
+
+    let obtained = bis_sync::read_obtained_items(&sv_path).map_err(|e| {
+        let msg = format!("Failed to read BiS data: {}", e);
+        state.lock().unwrap().add_log(LogLevel::Error, &msg);
+        msg
+    })?;
+
+    if obtained.is_empty() {
+        return Ok("No obtained BiS items to sync".to_string());
+    }
+
+    state.lock().unwrap().add_log(
+        LogLevel::Info,
+        &format!("Syncing {} obtained BiS item(s)...", obtained.len()),
+    );
+
+    let client = RaidhubApiClient::new(&token);
+    match client.sync_bis_obtained(&obtained).await {
+        Ok(response) => {
+            let updated = response
+                .get("updated")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0);
+            let result_msg = format!("BiS sync: {} item(s) marked as obtained", updated);
+            state
+                .lock()
+                .unwrap()
+                .add_log(LogLevel::Success, &result_msg);
+            Ok(result_msg)
+        }
+        Err(e) => {
+            let msg = format!("BiS obtained sync failed: {}", e);
             state.lock().unwrap().add_log(LogLevel::Error, &msg);
             Err(msg)
         }

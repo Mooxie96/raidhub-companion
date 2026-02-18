@@ -1,9 +1,11 @@
 pub mod api_client;
 pub mod app_state;
+pub mod bis_sync;
 pub mod commands;
 pub mod file_watcher;
 pub mod gargul_parser;
 pub mod lua_parser;
+pub mod lua_writer;
 pub mod wow_detector;
 
 use app_state::{AppState, LogLevel, SharedState};
@@ -37,6 +39,8 @@ pub fn run() {
             commands::set_wow_path,
             commands::sync_now,
             commands::sync_gdkp,
+            commands::download_bis,
+            commands::sync_bis_obtained,
             commands::get_log_entries,
             commands::clear_log,
             commands::get_watcher_status,
@@ -226,6 +230,17 @@ async fn start_auto_sync(app: tauri::AppHandle) {
                         }
                         let _ = commands::sync_gdkp(app.state()).await;
                         let _ = app.emit("gdkp-sync-complete", ());
+                    }
+                    Ok(file_watcher::WatcherEvent::BisChanged(_path)) => {
+                        {
+                            let state = app.state::<SharedState>();
+                            state.lock().unwrap().add_log(
+                                LogLevel::Info,
+                                "CharTrackerBiS.lua changed, syncing obtained items...",
+                            );
+                        }
+                        let _ = commands::sync_bis_obtained(app.state()).await;
+                        let _ = app.emit("bis-sync-complete", ());
                     }
                     Ok(file_watcher::WatcherEvent::Error(e)) => {
                         let state = app.state::<SharedState>();
