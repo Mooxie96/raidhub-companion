@@ -45,5 +45,12 @@
       }
     }
   },
-  "plugins": {}
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/Mooxie96/raidhub-companion/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDBFNUVEN0FFRjY4NDRCMzcKUldRM1M0VDJydGRlRHJvZ1VYWHE4N3J3SWhXYThoaGllYjU2NDR4NEUvR21WWEtkaVM4TmExK1AK"
+    }
+  }
 }

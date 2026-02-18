@@ -1,5 +1,7 @@
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-shell";
+import { check } from "@tauri-apps/plugin-updater";
+import { relaunch } from "@tauri-apps/plugin-shell";
 import * as api from "./api";
 import type { LogEntry, WowAccount } from "./types";
 
@@ -38,11 +40,19 @@ const btnClearLog = $("btn-clear-log");
 const btnSync = $("btn-sync") as HTMLButtonElement;
 const linkWebsite = $("link-website");
 
+const updateBanner = $("update-banner");
+const updateVersion = $("update-version");
+const btnUpdate = $("btn-update");
+const btnUpdateDismiss = $("btn-update-dismiss");
+const updateProgress = $("update-progress");
+const updateProgressText = $("update-progress-text");
+
 // ============================================================
 // State
 // ============================================================
 
 let syncing = false;
+let pendingUpdate: Awaited<ReturnType<typeof check>> | null = null;
 
 // ============================================================
 // UI Update Functions
@@ -321,6 +331,54 @@ async function refreshAll() {
 }
 
 // ============================================================
+// Update Functions
+// ============================================================
+
+async function checkForUpdates() {
+  try {
+    const update = await check();
+    if (update) {
+      pendingUpdate = update;
+      updateVersion.textContent = update.version;
+      updateBanner.classList.remove("hidden");
+    }
+  } catch (e) {
+    console.error("Update check failed:", e);
+  }
+}
+
+async function installUpdate() {
+  if (!pendingUpdate) return;
+
+  updateBanner.classList.add("hidden");
+  updateProgress.classList.remove("hidden");
+  updateProgressText.textContent = "Update wird heruntergeladen...";
+
+  try {
+    await pendingUpdate.downloadAndInstall((event) => {
+      if (event.event === "Started" && event.data.contentLength) {
+        updateProgressText.textContent = `Downloading... (${Math.round(event.data.contentLength / 1024)} KB)`;
+      } else if (event.event === "Finished") {
+        updateProgressText.textContent = "Installation abgeschlossen. Neustart...";
+      }
+    });
+    await relaunch();
+  } catch (e) {
+    console.error("Update install failed:", e);
+    updateProgress.classList.add("hidden");
+    updateBanner.classList.remove("hidden");
+  }
+}
+
+btnUpdate.addEventListener("click", () => {
+  installUpdate();
+});
+
+btnUpdateDismiss.addEventListener("click", () => {
+  updateBanner.classList.add("hidden");
+});
+
+// ============================================================
 // Tauri Events
 // ============================================================
 
@@ -329,11 +387,16 @@ listen("sync-complete", () => {
   refreshAll();
 });
 
+listen("check-for-updates", () => {
+  checkForUpdates();
+});
+
 // ============================================================
 // Init
 // ============================================================
 
 refreshAll();
+checkForUpdates();
 
 // Refresh periodically (every 30 seconds) for "time ago" updates
 setInterval(() => {

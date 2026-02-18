@@ -23,6 +23,7 @@ pub fn run() {
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
         ))
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(Mutex::new(AppState::default()) as SharedState)
         .invoke_handler(tauri::generate_handler![
             commands::get_settings,
@@ -41,12 +42,14 @@ pub fn run() {
             // Build tray menu
             let show = MenuItemBuilder::with_id("show", "Show Window").build(app)?;
             let sync = MenuItemBuilder::with_id("sync", "Sync Now").build(app)?;
+            let check_update = MenuItemBuilder::with_id("check_update", "Nach Updates suchen").build(app)?;
             let quit = MenuItemBuilder::with_id("quit", "Quit").build(app)?;
 
             let menu = MenuBuilder::new(app)
                 .item(&show)
                 .separator()
                 .item(&sync)
+                .item(&check_update)
                 .separator()
                 .item(&quit)
                 .build()?;
@@ -68,6 +71,13 @@ pub fn run() {
                             let _ = commands::sync_now(state).await;
                             let _ = app_handle.emit("sync-complete", ());
                         });
+                    }
+                    "check_update" => {
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                        let _ = app.emit("check-for-updates", ());
                     }
                     "quit" => {
                         app.exit(0);

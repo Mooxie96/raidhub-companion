@@ -19,3 +19,8 @@ Thumbs.db
 # Environment
 .env
 .env.local
+
+# Tauri signing keys
+~/.tauri/
+*.key
+*.key.pub

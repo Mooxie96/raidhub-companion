@@ -8,6 +8,26 @@
 </head>
 <body>
   <div class="app">
+    <!-- Update Banner -->
+    <div id="update-banner" class="update-banner hidden">
+      <div class="update-info">
+        <span class="update-icon">&#x2B06;</span>
+        <span>Version <strong id="update-version"></strong> verfügbar!</span>
+      </div>
+      <div class="update-actions">
+        <button id="btn-update" class="btn btn-primary btn-small">Aktualisieren</button>
+        <button id="btn-update-dismiss" class="btn btn-small">Später</button>
+      </div>
+    </div>
+
+    <!-- Update Progress Banner (shown during download/install) -->
+    <div id="update-progress" class="update-banner update-progress hidden">
+      <div class="update-info">
+        <span class="update-icon">&#x21BB;</span>
+        <span id="update-progress-text">Update wird heruntergeladen...</span>
+      </div>
+    </div>
+
     <!-- Status Section -->
     <div class="section">
       <div class="section-header">
