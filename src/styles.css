@@ -364,6 +364,28 @@ select {
   padding-top: 4px;
 }
 
+.footer-buttons {
+  display: flex;
+  gap: 6px;
+}
+
+.btn-gdkp {
+  background: rgba(245, 158, 11, 0.15);
+  border-color: rgba(245, 158, 11, 0.4);
+  color: var(--warning);
+  font-weight: 500;
+}
+
+.btn-gdkp:hover {
+  background: rgba(245, 158, 11, 0.25);
+  border-color: rgba(245, 158, 11, 0.6);
+}
+
+.btn-gdkp:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .footer-info {
   display: flex;
   align-items: center;

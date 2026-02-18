@@ -38,6 +38,7 @@ const logEmpty = $("log-empty");
 const btnClearLog = $("btn-clear-log");
 
 const btnSync = $("btn-sync") as HTMLButtonElement;
+const btnSyncGdkp = $("btn-sync-gdkp") as HTMLButtonElement;
 const linkWebsite = $("link-website");
 
 const updateBanner = $("update-banner");
@@ -52,6 +53,7 @@ const updateProgressText = $("update-progress-text");
 // ============================================================
 
 let syncing = false;
+let syncingGdkp = false;
 let pendingUpdate: Awaited<ReturnType<typeof check>> | null = null;
 
 // ============================================================
@@ -95,6 +97,7 @@ function showTokenSet(token: string) {
   tokenSet.style.display = "flex";
   tokenPrefix.textContent = token.substring(0, 11) + "••••••••";
   btnSync.disabled = false;
+  btnSyncGdkp.disabled = false;
 }
 
 function showTokenEmpty() {
@@ -102,6 +105,7 @@ function showTokenEmpty() {
   tokenSet.style.display = "none";
   tokenInput.value = "";
   btnSync.disabled = true;
+  btnSyncGdkp.disabled = true;
 }
 
 function populateAccounts(accounts: WowAccount[]) {
@@ -265,6 +269,23 @@ btnSync.addEventListener("click", async () => {
   }
 });
 
+btnSyncGdkp.addEventListener("click", async () => {
+  if (syncingGdkp) return;
+  syncingGdkp = true;
+  btnSyncGdkp.disabled = true;
+  btnSyncGdkp.textContent = "Syncing...";
+  try {
+    await api.syncGdkp();
+  } catch (e) {
+    console.error("GDKP sync error:", e);
+  } finally {
+    syncingGdkp = false;
+    btnSyncGdkp.disabled = false;
+    btnSyncGdkp.textContent = "Sync GDKP";
+    await refreshAll();
+  }
+});
+
 btnClearLog.addEventListener("click", async () => {
   await api.clearLog();
   renderLogs([]);
@@ -384,6 +405,13 @@ btnUpdateDismiss.addEventListener("click", () => {
 
 listen("sync-complete", () => {
   setSyncing(false);
+  refreshAll();
+});
+
+listen("gdkp-sync-complete", () => {
+  syncingGdkp = false;
+  btnSyncGdkp.disabled = false;
+  btnSyncGdkp.textContent = "Sync GDKP";
   refreshAll();
 });
 

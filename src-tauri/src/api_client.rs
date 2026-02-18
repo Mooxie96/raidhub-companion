@@ -1,6 +1,7 @@
 /// HTTP client for the Raidhub API.
 /// Handles sync and status endpoints with Bearer token auth.
 
+use crate::gargul_parser::GargulSyncPayload;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -62,6 +63,16 @@ pub struct StatusResponse {
     pub character_count: u32,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GdkpSyncResponse {
+    pub sessions_imported: u32,
+    pub sessions_updated: u32,
+    pub items_imported: u32,
+    #[serde(default)]
+    pub import_id: Option<String>,
+}
+
 pub struct RaidhubApiClient {
     client: Client,
     token: String,
@@ -94,6 +105,38 @@ impl RaidhubApiClient {
         match response.status().as_u16() {
             200 => response
                 .json::<SyncResponse>()
+                .await
+                .map_err(|e| ApiError::ServerError(format!("Failed to parse response: {}", e))),
+            401 => Err(ApiError::Unauthorized),
+            400 => {
+                let text = response.text().await.unwrap_or_default();
+                Err(ApiError::BadRequest(text))
+            }
+            status => {
+                let text = response.text().await.unwrap_or_default();
+                Err(ApiError::ServerError(format!("HTTP {}: {}", status, text)))
+            }
+        }
+    }
+
+    /// POST /api/gdkp/gargul/sync — sync GDKP session data from Gargul
+    pub async fn sync_gdkp(
+        &self,
+        payload: &GargulSyncPayload,
+    ) -> Result<GdkpSyncResponse, ApiError> {
+        let response = self
+            .client
+            .post(format!("{}/api/gdkp/gargul/sync", BASE_URL))
+            .header("Authorization", format!("Bearer {}", self.token))
+            .header("Content-Type", "application/json")
+            .json(payload)
+            .send()
+            .await
+            .map_err(|e| ApiError::NetworkError(e.to_string()))?;
+
+        match response.status().as_u16() {
+            200 => response
+                .json::<GdkpSyncResponse>()
                 .await
                 .map_err(|e| ApiError::ServerError(format!("Failed to parse response: {}", e))),
             401 => Err(ApiError::Unauthorized),

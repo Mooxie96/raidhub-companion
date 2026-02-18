@@ -51,3 +51,7 @@ export async function clearLog(): Promise<void> {
 export async function getWatcherStatus(): Promise<boolean> {
   return invoke("get_watcher_status");
 }
+
+export async function syncGdkp(): Promise<string> {
+  return invoke("sync_gdkp");
+}

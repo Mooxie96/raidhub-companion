@@ -1,4 +1,4 @@
-/// File watcher for CharTracker.lua SavedVariables.
+/// File watcher for SavedVariables (CharTracker.lua and Gargul.lua).
 /// Uses notify crate with debouncing to detect file changes
 /// and trigger sync automatically.
 
@@ -10,11 +10,12 @@ use std::time::Duration;
 
 pub enum WatcherEvent {
     FileChanged(PathBuf),
+    GargulChanged(PathBuf),
     Error(String),
 }
 
-/// Start watching a directory for changes to CharTracker.lua.
-/// Returns a receiver that emits events when the file changes.
+/// Start watching a directory for changes to CharTracker.lua and Gargul.lua.
+/// Returns a receiver that emits events when either file changes.
 /// The watcher handle must be kept alive (dropping it stops watching).
 pub fn start_watching(
     saved_variables_dir: &Path,
@@ -26,7 +27,8 @@ pub fn start_watching(
     String,
 > {
     let (tx, rx) = mpsc::channel();
-    let target_file = "CharTracker.lua".to_lowercase();
+    let chartracker_file = "chartracker.lua";
+    let gargul_file = "gargul.lua";
 
     let sender = tx.clone();
     let mut debouncer = new_debouncer(
@@ -41,9 +43,14 @@ pub fn start_watching(
                                 .file_name()
                                 .map(|n| n.to_string_lossy().to_lowercase());
 
-                            if file_name.as_deref() == Some(&target_file) {
-                                let _ =
-                                    sender.send(WatcherEvent::FileChanged(event.path.clone()));
+                            if let Some(name) = file_name.as_deref() {
+                                if name == chartracker_file {
+                                    let _ = sender
+                                        .send(WatcherEvent::FileChanged(event.path.clone()));
+                                } else if name == gargul_file {
+                                    let _ = sender
+                                        .send(WatcherEvent::GargulChanged(event.path.clone()));
+                                }
                             }
                         }
                     }

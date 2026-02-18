@@ -2,6 +2,7 @@ pub mod api_client;
 pub mod app_state;
 pub mod commands;
 pub mod file_watcher;
+pub mod gargul_parser;
 pub mod lua_parser;
 pub mod wow_detector;
 
@@ -34,6 +35,7 @@ pub fn run() {
             commands::detect_wow_path,
             commands::set_wow_path,
             commands::sync_now,
+            commands::sync_gdkp,
             commands::get_log_entries,
             commands::clear_log,
             commands::get_watcher_status,
@@ -212,6 +214,17 @@ async fn start_auto_sync(app: tauri::AppHandle) {
                         }
                         let _ = commands::sync_now(app.state()).await;
                         let _ = app.emit("sync-complete", ());
+                    }
+                    Ok(file_watcher::WatcherEvent::GargulChanged(_path)) => {
+                        {
+                            let state = app.state::<SharedState>();
+                            state.lock().unwrap().add_log(
+                                LogLevel::Info,
+                                "Gargul.lua changed, syncing GDKP...",
+                            );
+                        }
+                        let _ = commands::sync_gdkp(app.state()).await;
+                        let _ = app.emit("gdkp-sync-complete", ());
                     }
                     Ok(file_watcher::WatcherEvent::Error(e)) => {
                         let state = app.state::<SharedState>();

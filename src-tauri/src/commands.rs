@@ -3,6 +3,7 @@
 
 use crate::api_client::RaidhubApiClient;
 use crate::app_state::{ConnectionStatus, LogEntry, LogLevel, Settings, SharedState};
+use crate::gargul_parser;
 use crate::lua_parser;
 use crate::wow_detector::{self, WowAccount};
 use std::path::PathBuf;
@@ -258,6 +259,110 @@ pub async fn sync_now(state: State<'_, SharedState>) -> Result<String, String> {
         }
         Err(e) => {
             let msg = format!("Sync failed: {}", e);
+            state.lock().unwrap().add_log(LogLevel::Error, &msg);
+            Err(msg)
+        }
+    }
+}
+
+// ============================================================
+// GDKP Sync (Gargul)
+// ============================================================
+
+#[tauri::command]
+pub async fn sync_gdkp(state: State<'_, SharedState>) -> Result<String, String> {
+    let (token, wow_path, wow_account) = {
+        let app = state.lock().unwrap();
+        (
+            app.settings.api_token.clone(),
+            app.settings.wow_path.clone(),
+            app.settings.wow_account.clone(),
+        )
+    };
+
+    let token = token.ok_or("No API token configured")?;
+    let wow_path = wow_path.ok_or("WoW path not configured")?;
+    let wow_account = wow_account.ok_or("WoW account not selected")?;
+
+    state
+        .lock()
+        .unwrap()
+        .add_log(LogLevel::Info, "Starting GDKP sync...");
+
+    // Build path to Gargul.lua SavedVariables
+    let gargul_path = PathBuf::from(&wow_path)
+        .join("_classic_")
+        .join("WTF")
+        .join("Account")
+        .join(&wow_account)
+        .join("SavedVariables")
+        .join("Gargul.lua");
+
+    if !gargul_path.exists() {
+        let msg = format!(
+            "Gargul.lua not found at {}. Make sure the Gargul addon is installed and you've logged in at least once.",
+            gargul_path.display()
+        );
+        state.lock().unwrap().add_log(LogLevel::Error, &msg);
+        return Err(msg);
+    }
+
+    // Read file with retries
+    let file_content = read_file_with_retry(&gargul_path, 3).await?;
+
+    // Parse Gargul data
+    let payload = gargul_parser::parse_gargul_gdkp(&file_content).map_err(|e| {
+        let msg = format!("Failed to parse Gargul.lua: {}", e);
+        state.lock().unwrap().add_log(LogLevel::Error, &msg);
+        msg
+    })?;
+
+    let locked_count = payload
+        .sessions
+        .iter()
+        .filter(|s| s.locked_at.is_some())
+        .count();
+
+    if locked_count == 0 {
+        let msg = format!(
+            "Found {} GDKP session(s) but none are locked. Only locked sessions are synced.",
+            payload.sessions.len()
+        );
+        state.lock().unwrap().add_log(LogLevel::Info, &msg);
+        return Ok(msg);
+    }
+
+    state.lock().unwrap().add_log(
+        LogLevel::Info,
+        &format!(
+            "Found {} locked GDKP session(s) to sync",
+            locked_count
+        ),
+    );
+
+    // Sync to API
+    let client = RaidhubApiClient::new(&token);
+    match client.sync_gdkp(&payload).await {
+        Ok(response) => {
+            let result_msg = format!(
+                "GDKP sync: {} imported, {} updated, {} items",
+                response.sessions_imported, response.sessions_updated, response.items_imported
+            );
+
+            let mut app = state.lock().unwrap();
+            app.connection.connected = true;
+            app.add_log(LogLevel::Success, &result_msg);
+
+            Ok(result_msg)
+        }
+        Err(crate::api_client::ApiError::Unauthorized) => {
+            let mut app = state.lock().unwrap();
+            app.connection.connected = false;
+            app.add_log(LogLevel::Error, "GDKP sync failed: Token expired or revoked");
+            Err("Token expired or revoked. Please generate a new token on the website.".to_string())
+        }
+        Err(e) => {
+            let msg = format!("GDKP sync failed: {}", e);
             state.lock().unwrap().add_log(LogLevel::Error, &msg);
             Err(msg)
         }
