@@ -252,7 +252,7 @@ pub async fn sync_now(state: State<'_, SharedState>) -> Result<String, String> {
 
             Ok(result_msg)
         }
-        Err(crate::api_client::ApiError::Unauthorized) => {
+        Err(crate::api_client::ApiError::Unauthorized(_)) => {
             let mut app = state.lock().unwrap();
             app.connection.connected = false;
             app.add_log(LogLevel::Error, "Token expired or revoked");
@@ -356,7 +356,7 @@ pub async fn sync_gdkp(state: State<'_, SharedState>) -> Result<String, String> 
 
             Ok(result_msg)
         }
-        Err(crate::api_client::ApiError::Unauthorized) => {
+        Err(crate::api_client::ApiError::Unauthorized(_)) => {
             let mut app = state.lock().unwrap();
             app.connection.connected = false;
             app.add_log(LogLevel::Error, "GDKP sync failed: Token expired or revoked");

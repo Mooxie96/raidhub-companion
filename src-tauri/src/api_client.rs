@@ -7,11 +7,11 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-const BASE_URL: &str = "https://goldschweine.de";
+const BASE_URL: &str = "https://www.goldschweine.de";
 
 #[derive(Debug)]
 pub enum ApiError {
-    Unauthorized,
+    Unauthorized(String),
     BadRequest(String),
     ServerError(String),
     NetworkError(String),
@@ -20,7 +20,13 @@ pub enum ApiError {
 impl std::fmt::Display for ApiError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ApiError::Unauthorized => write!(f, "Token expired or revoked"),
+            ApiError::Unauthorized(detail) => {
+                if detail.is_empty() {
+                    write!(f, "Token expired or revoked")
+                } else {
+                    write!(f, "Token expired or revoked ({})", detail)
+                }
+            }
             ApiError::BadRequest(msg) => write!(f, "Bad request: {}", msg),
             ApiError::ServerError(msg) => write!(f, "Server error: {}", msg),
             ApiError::NetworkError(msg) => write!(f, "Network error: {}", msg),
@@ -108,7 +114,10 @@ impl RaidhubApiClient {
                 .json::<SyncResponse>()
                 .await
                 .map_err(|e| ApiError::ServerError(format!("Failed to parse response: {}", e))),
-            401 => Err(ApiError::Unauthorized),
+            401 => {
+                let text = response.text().await.unwrap_or_default();
+                Err(ApiError::Unauthorized(text))
+            }
             400 => {
                 let text = response.text().await.unwrap_or_default();
                 Err(ApiError::BadRequest(text))
@@ -140,7 +149,10 @@ impl RaidhubApiClient {
                 .json::<GdkpSyncResponse>()
                 .await
                 .map_err(|e| ApiError::ServerError(format!("Failed to parse response: {}", e))),
-            401 => Err(ApiError::Unauthorized),
+            401 => {
+                let text = response.text().await.unwrap_or_default();
+                Err(ApiError::Unauthorized(text))
+            }
             400 => {
                 let text = response.text().await.unwrap_or_default();
                 Err(ApiError::BadRequest(text))
@@ -167,7 +179,10 @@ impl RaidhubApiClient {
                 .json::<Value>()
                 .await
                 .map_err(|e| ApiError::ServerError(format!("Failed to parse response: {}", e))),
-            401 => Err(ApiError::Unauthorized),
+            401 => {
+                let text = response.text().await.unwrap_or_default();
+                Err(ApiError::Unauthorized(text))
+            }
             status => {
                 let text = response.text().await.unwrap_or_default();
                 Err(ApiError::ServerError(format!("HTTP {}: {}", status, text)))
@@ -197,7 +212,10 @@ impl RaidhubApiClient {
                 .json::<Value>()
                 .await
                 .map_err(|e| ApiError::ServerError(format!("Failed to parse response: {}", e))),
-            401 => Err(ApiError::Unauthorized),
+            401 => {
+                let text = response.text().await.unwrap_or_default();
+                Err(ApiError::Unauthorized(text))
+            }
             400 => {
                 let text = response.text().await.unwrap_or_default();
                 Err(ApiError::BadRequest(text))
@@ -224,7 +242,10 @@ impl RaidhubApiClient {
                 .json::<StatusResponse>()
                 .await
                 .map_err(|e| ApiError::ServerError(format!("Failed to parse response: {}", e))),
-            401 => Err(ApiError::Unauthorized),
+            401 => {
+                let text = response.text().await.unwrap_or_default();
+                Err(ApiError::Unauthorized(text))
+            }
             status => {
                 let text = response.text().await.unwrap_or_default();
                 Err(ApiError::ServerError(format!("HTTP {}: {}", status, text)))
