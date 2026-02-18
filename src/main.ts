@@ -1,7 +1,7 @@
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-shell";
 import { check } from "@tauri-apps/plugin-updater";
-import { relaunch } from "@tauri-apps/plugin-shell";
+import { relaunch } from "@tauri-apps/plugin-process";
 import * as api from "./api";
 import type { LogEntry, WowAccount } from "./types";
 

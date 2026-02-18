@@ -9,6 +9,7 @@
     "shell:default",
     "store:default",
     "autostart:default",
-    "updater:default"
+    "updater:default",
+    "process:default"
   ]
 }

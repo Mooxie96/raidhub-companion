@@ -25,6 +25,7 @@ pub fn run() {
             None,
         ))
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .manage(Mutex::new(AppState::default()) as SharedState)
         .invoke_handler(tauri::generate_handler![
             commands::get_settings,
