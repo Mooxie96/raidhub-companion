@@ -215,6 +215,7 @@ impl<'a> Parser<'a> {
         let mut max_int_key: i64 = 0;
         let mut is_pure_array = true;
         let mut array_entries: Vec<(i64, Value)> = Vec::new();
+        let mut auto_index: i64 = 1; // Lua arrays are 1-based
 
         loop {
             self.skip_whitespace_and_comments();
@@ -233,6 +234,18 @@ impl<'a> Parser<'a> {
                     map.insert(s, value);
                 }
                 TableKey::Integer(i) => {
+                    array_entries.push((i, value.clone()));
+                    if i > max_int_key {
+                        max_int_key = i;
+                    }
+                    if i >= auto_index {
+                        auto_index = i + 1;
+                    }
+                    map.insert(i.to_string(), value);
+                }
+                TableKey::Auto => {
+                    let i = auto_index;
+                    auto_index += 1;
                     array_entries.push((i, value.clone()));
                     if i > max_int_key {
                         max_int_key = i;
@@ -318,6 +331,10 @@ impl<'a> Parser<'a> {
                 // In practice, WoW SavedVariables always use explicit keys
                 Ok((TableKey::Integer(1), value))
             }
+        } else if self.peek().map_or(false, |c| c == '{' || c == '"' || c == '\'' || c.is_ascii_digit() || c == '-') {
+            // Implicit array entry: value without explicit key (e.g., { {["id"]=1}, {["id"]=2} })
+            let value = self.parse_value()?;
+            Ok((TableKey::Auto, value))
         } else {
             Err(self.error("expected table key or '}'"))
         }
@@ -327,6 +344,7 @@ impl<'a> Parser<'a> {
 enum TableKey {
     String(String),
     Integer(i64),
+    Auto, // Implicit numeric key (array-style entry without [n] = ...)
 }
 
 /// Parse a WoW SavedVariables file and extract the named global variable.
@@ -545,6 +563,52 @@ mod tests {
         let result = parse_saved_variable(lua, "TestDB").unwrap();
         assert!(result.is_object());
         assert_eq!(result.as_object().unwrap().len(), 0);
+    }
+
+    #[test]
+    fn test_implicit_array_entries() {
+        let lua = r#"TestDB = {
+            ["currencies"] = {
+                {
+                    ["id"] = 463446,
+                    ["name"] = "Justice Points",
+                    ["count"] = 475,
+                },
+                {
+                    ["id"] = 134912,
+                    ["name"] = "Ironpaw Token",
+                    ["count"] = 1,
+                },
+            },
+        }"#;
+        let result = parse_saved_variable(lua, "TestDB").unwrap();
+        let currencies = result["currencies"].as_array().unwrap();
+        assert_eq!(currencies.len(), 2);
+        assert_eq!(currencies[0]["id"], 463446);
+        assert_eq!(currencies[0]["name"], "Justice Points");
+        assert_eq!(currencies[1]["name"], "Ironpaw Token");
+    }
+
+    #[test]
+    fn test_implicit_array_with_mixed_types() {
+        let lua = r#"TestDB = {
+            ["specs"] = {
+                {
+                    ["id"] = 1,
+                    ["name"] = "Spec 0",
+                },
+                {
+                    ["id"] = 2,
+                    ["name"] = "Spec 0",
+                },
+            },
+            ["version"] = "1.0.0",
+        }"#;
+        let result = parse_saved_variable(lua, "TestDB").unwrap();
+        let specs = result["specs"].as_array().unwrap();
+        assert_eq!(specs.len(), 2);
+        assert_eq!(specs[0]["id"], 1);
+        assert_eq!(result["version"], "1.0.0");
     }
 
     #[test]
