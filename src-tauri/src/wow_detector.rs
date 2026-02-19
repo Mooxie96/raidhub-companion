@@ -71,8 +71,9 @@ fn check_registry() -> Option<PathBuf> {
 /// Returns all accounts found under _classic_\WTF\Account\*.
 pub fn scan_wow_accounts(wow_root: &Path) -> Vec<WowAccount> {
     let mut accounts = Vec::new();
+    let root = normalize_wow_root(wow_root);
 
-    let wtf_account_path = wow_root.join("_classic_").join("WTF").join("Account");
+    let wtf_account_path = root.join("_classic_").join("WTF").join("Account");
     if !wtf_account_path.exists() {
         return accounts;
     }
@@ -102,13 +103,85 @@ pub fn scan_wow_accounts(wow_root: &Path) -> Vec<WowAccount> {
     accounts
 }
 
+/// Normalize a WoW path to always be the root directory (without _classic_ suffix).
+/// Users might browse to `World of Warcraft\_classic_` instead of `World of Warcraft`,
+/// which would cause doubled paths like `_classic_\_classic_`.
+pub fn normalize_wow_root(path: &Path) -> PathBuf {
+    let path_str = path.to_string_lossy();
+    // Strip _classic_, _classic_era_, _retail_ suffixes if present
+    for suffix in &["_classic_", "_classic_era_", "_retail_"] {
+        if path_str.ends_with(suffix) || path_str.ends_with(&format!("{}\\", suffix)) || path_str.ends_with(&format!("{}/", suffix)) {
+            let trimmed = path_str.trim_end_matches('\\').trim_end_matches('/');
+            if let Some(stripped) = trimmed.strip_suffix(suffix) {
+                return PathBuf::from(stripped);
+            }
+        }
+    }
+    path.to_path_buf()
+}
+
 /// Get the full path to CharTracker.lua for a given account.
 pub fn get_chartracker_path(wow_root: &Path, account_name: &str) -> PathBuf {
-    wow_root
+    normalize_wow_root(wow_root)
         .join("_classic_")
         .join("WTF")
         .join("Account")
         .join(account_name)
         .join("SavedVariables")
         .join("CharTracker.lua")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_normalize_wow_root_already_correct() {
+        let path = PathBuf::from(r"C:\Program Files (x86)\World of Warcraft");
+        assert_eq!(normalize_wow_root(&path), path);
+    }
+
+    #[test]
+    fn test_normalize_wow_root_strips_classic() {
+        let path = PathBuf::from(r"C:\Program Files (x86)\World of Warcraft\_classic_");
+        let expected = PathBuf::from(r"C:\Program Files (x86)\World of Warcraft");
+        assert_eq!(normalize_wow_root(&path), expected);
+    }
+
+    #[test]
+    fn test_normalize_wow_root_strips_classic_with_trailing_slash() {
+        let path = PathBuf::from(r"C:\Program Files (x86)\World of Warcraft\_classic_\");
+        let expected = PathBuf::from(r"C:\Program Files (x86)\World of Warcraft");
+        assert_eq!(normalize_wow_root(&path), expected);
+    }
+
+    #[test]
+    fn test_normalize_wow_root_strips_classic_era() {
+        let path = PathBuf::from(r"C:\World of Warcraft\_classic_era_");
+        let expected = PathBuf::from(r"C:\World of Warcraft");
+        assert_eq!(normalize_wow_root(&path), expected);
+    }
+
+    #[test]
+    fn test_normalize_wow_root_strips_retail() {
+        let path = PathBuf::from(r"D:\Games\World of Warcraft\_retail_");
+        let expected = PathBuf::from(r"D:\Games\World of Warcraft");
+        assert_eq!(normalize_wow_root(&path), expected);
+    }
+
+    #[test]
+    fn test_chartracker_path_with_classic_root() {
+        let root = PathBuf::from(r"C:\WoW\_classic_");
+        let path = get_chartracker_path(&root, "12345#1");
+        // Should NOT have _classic_\_classic_
+        assert!(path.to_string_lossy().contains(r"_classic_\WTF"));
+        assert!(!path.to_string_lossy().contains(r"_classic_\_classic_"));
+    }
+
+    #[test]
+    fn test_chartracker_path_with_normal_root() {
+        let root = PathBuf::from(r"C:\WoW");
+        let path = get_chartracker_path(&root, "12345#1");
+        assert!(path.to_string_lossy().contains(r"_classic_\WTF"));
+    }
 }

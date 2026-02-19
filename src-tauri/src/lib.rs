@@ -182,7 +182,7 @@ async fn start_auto_sync(app: tauri::AppHandle) {
 
     let _ = token; // Used later for validation if needed
 
-    let sv_dir = std::path::PathBuf::from(&wow_path)
+    let sv_dir = wow_detector::normalize_wow_root(&std::path::PathBuf::from(&wow_path))
         .join("_classic_")
         .join("WTF")
         .join("Account")

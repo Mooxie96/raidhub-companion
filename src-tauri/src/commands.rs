@@ -291,7 +291,7 @@ pub async fn sync_gdkp(state: State<'_, SharedState>) -> Result<String, String> 
         .add_log(LogLevel::Info, "Starting GDKP sync...");
 
     // Build path to Gargul.lua SavedVariables
-    let gargul_path = PathBuf::from(&wow_path)
+    let gargul_path = wow_detector::normalize_wow_root(&PathBuf::from(&wow_path))
         .join("_classic_")
         .join("WTF")
         .join("Account")
@@ -422,7 +422,7 @@ pub async fn download_bis(state: State<'_, SharedState>) -> Result<String, Strin
     }
 
     // Write to SavedVariables directory
-    let sv_path = PathBuf::from(&wow_path)
+    let sv_path = wow_detector::normalize_wow_root(&PathBuf::from(&wow_path))
         .join("_classic_")
         .join("WTF")
         .join("Account")
@@ -463,7 +463,7 @@ pub async fn sync_bis_obtained(state: State<'_, SharedState>) -> Result<String, 
     let wow_path = wow_path.ok_or("WoW path not configured")?;
     let wow_account = wow_account.ok_or("WoW account not selected")?;
 
-    let sv_path = PathBuf::from(&wow_path)
+    let sv_path = wow_detector::normalize_wow_root(&PathBuf::from(&wow_path))
         .join("_classic_")
         .join("WTF")
         .join("Account")
